@@ -31,7 +31,7 @@ const int MAIN_POWER = 15;
 const int WIFI_STATUS_LIGHT = 2;
 
 // CONSTANTS
-const unsigned long FAN_SHUTDOWN_DELAY = 1000 * (.5 * 60); // 10 min delay
+const unsigned long FAN_SHUTDOWN_DELAY = 1000 * (10 * 60); // 10 min delay
 const unsigned long BUTTON_PRESS_TIME = 1000 * 1.5; // 1.5 second button press
 const String FAN_PREFIX = "?fan=";
 const String PUMP_PREFIX = "?pmp=";
@@ -117,10 +117,12 @@ void loop() {
       if (debug) Serial.println("Fan State change: " + String(req[req.indexOf(FAN_PREFIX) + 5]));
       String a = String(req[req.indexOf(FAN_PREFIX) + 5]);
       updateFan(a.toInt());
-      String s = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<!DOCTYPE HTML>\r\n<html>\r\nStatus is now:  \r\n";
+      String s = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<!DOCTYPE HTML>\r\n<html>\r\nStatus is now:<p>";
       s += getFanState();
       s += ",";
       s += getPumpState();
+      s += "<p>Setting fan to ";
+      s += a;
       s += "</html>\n";
       client.print(s);
 
