@@ -35,6 +35,7 @@ const unsigned long FAN_SHUTDOWN_DELAY = 1000 * (10 * 60); // 10 min delay
 const unsigned long BUTTON_PRESS_TIME = 1000 * 1.5; // 1.5 second button press
 const String FAN_PREFIX = "?fan=";
 const String PUMP_PREFIX = "?pmp=";
+const String STATUS_IOT = "?status";
 
 // Time Keepers
 unsigned long fanShutdownTime;
@@ -104,8 +105,13 @@ void loop() {
       if (debug) Serial.println("Index Page");
       client.stop();
     }
-    else if (req.indexOf("?status") != -1) {
-      if (debug) Serial.println("Status page req");
+    else if (req.indexOf(STATUS_IOT) != -1) {
+    // Send formatted Status for IOT Devices
+    client.print(String(getFanState()) + "," + String(getPumpState()) + "," + String(pendingFanShutdown));
+    if (debug) Serial.print(String(getFanState()) + "," + String(getPumpState()) + "," + String(pendingFanShutdown));
+    }
+    else if (req.indexOf("/s") != -1) {
+    if (debug) Serial.println("Status page req");
       String s = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<!DOCTYPE HTML>\r\n<html>\r\nStatus is now:  \r\n";
       s += getFanState();
       s += ",";
@@ -114,7 +120,7 @@ void loop() {
       client.print(s);
     }
     else if (req.indexOf(FAN_PREFIX) != -1) {
-      if (debug) Serial.println("Fan State change: " + String(req[req.indexOf(FAN_PREFIX) + 5]));
+    if (debug) Serial.println("Fan State change: " + String(req[req.indexOf(FAN_PREFIX) + 5]));
       String a = String(req[req.indexOf(FAN_PREFIX) + 5]);
       updateFan(a.toInt());
       String s = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<!DOCTYPE HTML>\r\n<html>\r\nStatus is now:<p>";
@@ -128,7 +134,7 @@ void loop() {
 
     }
     else if (req.indexOf(PUMP_PREFIX) != -1) {
-      if (debug) Serial.println("Pump State change: " + String(req[req.indexOf(PUMP_PREFIX) + 5]));
+    if (debug) Serial.println("Pump State change: " + String(req[req.indexOf(PUMP_PREFIX) + 5]));
       String a = String(req[req.indexOf(PUMP_PREFIX) + 5]);
       if (a == "1" && !getPumpState()) powerPump();
       else if (a == "0" && getPumpState()) powerPump();
@@ -142,7 +148,7 @@ void loop() {
       client.print(s);
     }
     else if (req.indexOf("?shutdown") != -1) {
-      if (debug) Serial.println("Cooler Shutdown iniated.");
+    if (debug) Serial.println("Cooler Shutdown iniated.");
       shutDownSequence();
       String s = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<!DOCTYPE HTML>\r\n<html>\r\nStatus is now: \r\n";
       s += getFanState();
@@ -286,7 +292,7 @@ void updateButtons() {
 
   else if (fanPowerPress && timeNow >= fanButtonTime) {
     //turn off our fan pin
-    Serial.println("Fan Power Switch Off");
+    if (debug) Serial.println("Fan Power Switch Off");
     digitalWrite(FAN_POWER, LOW);
     //reset flag
     fanPowerPress = false;
