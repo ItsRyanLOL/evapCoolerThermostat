@@ -20,7 +20,10 @@ const char* password = "onthefridge";
 */
 
 //School Config
-const char* ssid = "CCASTUDENT";
+const char* ssid = "RyansIOTDevicePlayground";
+const IPAddress ip(10,0,0,3);
+const IPAddress subnet(255, 255, 255, 0);
+const IPAddress gateway(10, 0, 0, 1);
 
 // Web Control Server on port 80
 WiFiServer server(80);
@@ -36,6 +39,7 @@ void setup() {
 
   // WIFI Setup
   WiFi.mode(WIFI_STA);
+  WiFi.config(ip, gateway, subnet);
   WiFi.begin(ssid/* SCHOOL CONFIG, password */);
   while (WiFi.status() != WL_CONNECTED) {
     digitalWrite(WIFI_STATUS_LIGHT, LOW);

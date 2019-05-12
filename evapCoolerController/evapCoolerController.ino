@@ -6,10 +6,15 @@
 // WIFI stuffs
 #include <ESP8266WiFi.h>
 
+const String VERSION = "v0.01a";
 const bool debug = true;
 
-const char* ssid     = "2Girls1SlowRouter";
-const char* password = "onthefridge";
+// SOFT AP CONFIG!
+IPAddress local_IP(10, 0, 0, 2);
+IPAddress gateway(10, 0, 0, 1);
+IPAddress subnet(255, 255, 255, 0);
+const char* ssid = "RyansIOTDevicePlayground";
+
 // Web Control Server on port 80
 WiFiServer server(80);
 
@@ -33,9 +38,13 @@ const int WIFI_STATUS_LIGHT = 2;
 // CONSTANTS
 const unsigned long FAN_SHUTDOWN_DELAY = 1000 * (10 * 60); // 10 min delay
 const unsigned long BUTTON_PRESS_TIME = 1000 * 1.5; // 1.5 second button press
-const String FAN_PREFIX = "?fan=";
-const String PUMP_PREFIX = "?pmp=";
+
+const String FAN_PREFIX = "!fan=";
+const String SHUTDOWN_PREFIX = "!shutdown";
+const String PUMP_PREFIX = "!pmp=";
+
 const String STATUS_IOT = "?status";
+const String INFO_IOT = "?info";
 
 // Time Keepers
 unsigned long fanShutdownTime;
@@ -57,21 +66,32 @@ void setup() {
   digitalWrite(MAIN_POWER, LOW);
 
   // Serial begin
-  /*if (debug)*/ Serial.begin(115200);
+  if (debug) Serial.begin(115200);
   if (debug) Serial.println();
 
-  // WIFI Setup
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
-    digitalWrite(WIFI_STATUS_LIGHT, LOW);
-    if (debug) Serial.print(".");
-    delay(500);
-  }
+  //  // WIFI Setup
+  //  WiFi.mode(WIFI_STA);
+  //  WiFi.begin(ssid/*, password*/);
+  //  while (WiFi.status() != WL_CONNECTED) {
+  //    digitalWrite(WIFI_STATUS_LIGHT, LOW);
+  //    if (debug) Serial.print(".");
+  //    delay(500);
+  //  }
+
+  // soft AP setup
+  digitalWrite(WIFI_STATUS_LIGHT, LOW);
+  WiFi.disconnect(true);
+  WiFi.softAPConfig(local_IP, gateway, subnet);
+  WiFi.softAP(ssid);
+
+
   digitalWrite(WIFI_STATUS_LIGHT, HIGH);
   if (debug) Serial.println("\nWifi Connected to " + String(ssid));
   server.begin();
-  if (debug) Serial.printf("on IP: %s", WiFi.localIP().toString().c_str());
+  if (debug) {
+    Serial.print("Soft-AP IP address = ");
+    Serial.println(WiFi.softAPIP());
+  }
 
 
 
@@ -106,12 +126,12 @@ void loop() {
       client.stop();
     }
     else if (req.indexOf(STATUS_IOT) != -1) {
-    // Send formatted Status for IOT Devices
-    client.print(String(getFanState()) + "," + String(getPumpState()) + "," + String(pendingFanShutdown));
-    if (debug) Serial.print(String(getFanState()) + "," + String(getPumpState()) + "," + String(pendingFanShutdown));
+      // Send formatted Status for IOT Devices
+      client.print(String(getFanState()) + "," + String(getPumpState()) + "," + String(pendingFanShutdown));
+      if (debug) Serial.print(String(getFanState()) + "," + String(getPumpState()) + "," + String(pendingFanShutdown));
     }
     else if (req.indexOf("/s") != -1) {
-    if (debug) Serial.println("Status page req");
+      if (debug) Serial.println("Status page req");
       String s = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<!DOCTYPE HTML>\r\n<html>\r\nStatus is now:  \r\n";
       s += getFanState();
       s += ",";
@@ -120,7 +140,7 @@ void loop() {
       client.print(s);
     }
     else if (req.indexOf(FAN_PREFIX) != -1) {
-    if (debug) Serial.println("Fan State change: " + String(req[req.indexOf(FAN_PREFIX) + 5]));
+      if (debug) Serial.println("Fan State change: " + String(req[req.indexOf(FAN_PREFIX) + 5]));
       String a = String(req[req.indexOf(FAN_PREFIX) + 5]);
       updateFan(a.toInt());
       String s = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<!DOCTYPE HTML>\r\n<html>\r\nStatus is now:<p>";
@@ -134,21 +154,14 @@ void loop() {
 
     }
     else if (req.indexOf(PUMP_PREFIX) != -1) {
-    if (debug) Serial.println("Pump State change: " + String(req[req.indexOf(PUMP_PREFIX) + 5]));
+      if (debug) Serial.println("Pump State change: " + String(req[req.indexOf(PUMP_PREFIX) + 5]));
       String a = String(req[req.indexOf(PUMP_PREFIX) + 5]);
       if (a == "1" && !getPumpState()) powerPump();
       else if (a == "0" && getPumpState()) powerPump();
-      String s = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<!DOCTYPE HTML>\r\n<html>\r\nStatus is now:<p>";
-      s += getFanState();
-      s += ",";
-      s += getPumpState();
-      s += "<p>Setting pump to ";
-      s += a;
-      s += "</html>\n";
-      client.print(s);
+      client.print("True");
     }
-    else if (req.indexOf("?shutdown") != -1) {
-    if (debug) Serial.println("Cooler Shutdown iniated.");
+    else if (req.indexOf(SHUTDOWN_PREFIX) != -1) {
+      if (debug) Serial.println("Cooler Shutdown iniated.");
       shutDownSequence();
       String s = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<!DOCTYPE HTML>\r\n<html>\r\nStatus is now: \r\n";
       s += getFanState();
@@ -156,6 +169,15 @@ void loop() {
       s += getPumpState();
       s += "</html>\n";
       client.print(s);
+    }
+    else if (req.indexOf(INFO_IOT) != -1) {
+      if (debug) Serial.println("INFO requested");
+      client.print("IOT Cooler Controller" + VERSION);
+    }
+    else if (req.indexOf("?mac") != -1) {
+      if (debug) Serial.println("MAC requested");
+      client.print(WiFi.macAddress());
+      client.stop();
     }
     delay(1);
     //client.stop();
